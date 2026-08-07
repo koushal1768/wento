@@ -1,79 +1,50 @@
-const userModel = require('../models/user.model');
-const userService = require('../services/user.service');
-const { validationResult } = require('express-validator');
-const blackListTokenModel = require('../models/blackListToken.model');
-
-module.exports.registerUser = async (req, res, next) => {
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { fullname, email, password } = req.body;
-
-    const isUserAlready = await userModel.findOne({ email });
-
-    if (isUserAlready) {
-        return res.status(400).json({ message: 'User already exist' });
-    }
-
-    const hashedPassword = await userModel.hashPassword(password);
-
-    const user = await userService.createUser({
-        firstname: fullname.firstname,
-        lastname: fullname.lastname,
-        email,
-        password: hashedPassword
-    });
-
-    const token = user.generateAuthToken();
-
-    res.status(201).json({ token, user });
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 
+const userSchema = new mongoose.Schema({
+    fullname: {
+        firstname: {
+            type: String,
+            required: true,
+            minlength: [ 3, 'First name must be at least 3 characters long' ],
+        },
+        lastname: {
+            type: String,
+            minlength: [ 3, 'Last name must be at least 3 characters long' ],
+        }
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        minlength: [ 5, 'Email must be at least 5 characters long' ],
+    },
+    password: {
+        type: String,
+        required: true,
+        select: false,
+    },
+    socketId: {
+        type: String,
+    },
+})
+
+userSchema.methods.generateAuthToken = function () {
+    const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    return token;
 }
 
-module.exports.loginUser = async (req, res, next) => {
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email, password } = req.body;
-
-    const user = await userModel.findOne({ email }).select('+password');
-
-    if (!user) {
-        return res.status(401).json({ message: 'Invalid email or password' });
-    }
-
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-        return res.status(401).json({ message: 'Invalid email or password' });
-    }
-
-    const token = user.generateAuthToken();
-
-    res.cookie('token', token);
-
-    res.status(200).json({ token, user });
+userSchema.methods.comparePassword = async function (password) {
+    return await bcrypt.compare(password, this.password);
 }
 
-module.exports.getUserProfile = async (req, res, next) => {
-
-    res.status(200).json(req.user);
-
+userSchema.statics.hashPassword = async function (password) {
+    return await bcrypt.hash(password, 10);
 }
 
-module.exports.logoutUser = async (req, res, next) => {
-    res.clearCookie('token');
-    const token = req.cookies.token || req.headers.authorization.split(' ')[ 1 ];
+const userModel = mongoose.model('user', userSchema);
 
-    await blackListTokenModel.create({ token });
 
-    res.status(200).json({ message: 'Logged out' });
-
-}
+module.exports = userModel;

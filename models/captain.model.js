@@ -1,34 +1,36 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 
 const captainSchema = new mongoose.Schema({
     fullname: {
-        firstname:{type: String,
-        required: true,
-        minlength: [3,'Firstname must be atleast 3 character long']
-    },
-        lastname:{type: String,
-        minlength: [3,'Firstname must be atleast 3 character long']
-    }
+        firstname: {
+            type: String,
+            required: true,
+            minlength: [ 3, 'Firstname must be at least 3 characters long' ],
+        },
+        lastname: {
+            type: String,
+            minlength: [ 3, 'Lastname must be at least 3 characters long' ],
+        }
     },
     email: {
         type: String,
         required: true,
         unique: true,
         lowercase: true,
-        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please add a valid email']
+        match: [ /^\S+@\S+\.\S+$/, 'Please enter a valid email' ]
     },
     password: {
         type: String,
         required: true,
         select: false,
-        
     },
     socketId: {
         type: String,
     },
-     status: {
+
+    status: {
         type: String,
         enum: [ 'active', 'inactive' ],
         default: 'inactive',
